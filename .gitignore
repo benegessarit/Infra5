@@ -1,0 +1,33 @@
+# Development
+.env
+.env.local
+*.log
+node_modules/
+__pycache__/
+*.pyc
+.pytest_cache/
+.coverage
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Claude Code
+.claude/settings.local.json
+
+# Temporary files
+/logs/*
+!/logs/.gitkeep
+/cycles/
+/checkpoints/
+
+# Build artifacts
+dist/
+build/
+target/

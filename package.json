@@ -1,0 +1,13 @@
+{
+  "name": "infra5",
+  "version": "1.0.0",
+  "description": "Infrastructure project with Claude Code Development Kit",
+  "scripts": {
+    "test": "echo \"No tests specified\" && exit 0",
+    "lint": "echo \"No linting configured\" && exit 0",
+    "typecheck": "echo \"No type checking configured\" && exit 0"
+  },
+  "keywords": ["claude-code", "dev-kit", "infrastructure"],
+  "author": "Luna",
+  "license": "MIT"
+}
