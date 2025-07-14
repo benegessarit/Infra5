@@ -27,6 +27,11 @@ This hierarchy allows AI agents to load targeted context efficiently while maint
 
 ## Tier 2: Component-Level Documentation
 
+### Development Framework Components
+- **[Claude Code AI Framework](/.claude/CONTEXT.md)** - *AI development automation.* Multi-agent commands, security hooks, context injection, and workflow orchestration
+- **[Resonance TDD Cycles](/cycles/CONTEXT.md)** - *Development session management.* TDD workflow tracking, checkpoint system, reality checklists, and evidence collection
+- **[Testing Framework](/tests/CONTEXT.md)** - *Quality assurance.* Command validation, integration testing, TDD support, and continuous verification
+
 ### Backend Components
 - **[Backend Context](/backend/CONTEXT.md)** - *Server implementation.* API patterns, database integration, service architecture, and performance considerations
 - **[Worker Services](/workers/CONTEXT.md)** - *Background processing.* Job queue patterns, scheduling, and async task management

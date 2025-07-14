@@ -1,4 +1,4 @@
-You are working on the VR Language Learning App project. The user has requested to create or regenerate documentation with the arguments: "$ARGUMENTS"
+You are working on the Claude Code End to End Workflow System and Automation project. The user has requested to create or regenerate documentation with the arguments: "$ARGUMENTS"
 
 ## Auto-Loaded Project Context:
 @/CLAUDE.md
