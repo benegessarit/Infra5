@@ -5,6 +5,9 @@
 
 set -euo pipefail
 
+# Source subissue detection and workflow enhancement functions
+source "$(dirname "$0")/subissue-functions.sh"
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -95,54 +98,67 @@ validate_issue_id() {
     return 0
 }
 
-# Extract directory name from Linear issue data
+# Enhanced directory extraction with Linear MCP integration
 extract_directory_name() {
     local issue_id="$1"
+    
     
     # Validate issue ID first
     if ! validate_issue_id "$issue_id"; then
         return 1
     fi
     
-    # For testing purposes, return a mock directory name
-    if [ "$issue_id" = "DAV-173" ]; then
-        echo "DAV-173-integrate-context-forge"
+    # Get issue data from Linear MCP integration
+    local issue_json
+    
+    # Try multiple sources for Linear issue data
+    local issue_json=""
+    
+    # 1. Check if data provided via environment (Claude/wrapper usage)
+    if [ -n "${LINEAR_ISSUE_DATA:-}" ]; then
+        issue_json="$LINEAR_ISSUE_DATA"
+        log "INFO" "Using Linear data from environment"
+    
+    # 2. Request via Claude marker (for interactive Claude sessions)
+    else
+        log "INFO" "Requesting Linear data from Claude..."
+        echo "🤖 CLAUDE_LINEAR_ACTION: GET_ISSUE_JSON $issue_id" >&2
+        # In Claude context, the runtime would inject data here
+    fi
+    
+    # Validate and use the data
+    if [ -n "$issue_json" ] && echo "$issue_json" | jq . >/dev/null 2>&1; then
+        # Use enhanced extraction with Linear data
+        extract_proper_directory_name "$issue_json"
+        return 0
+    else
+        # Fall back to generic naming
+        log "WARN" "No Linear data available, using generic naming"
+        log "INFO" "For enhanced features: 1) Run with Claude, or 2) Set LINEAR_ISSUE_DATA"
+        echo "$issue_id-issue"
         return 0
     fi
     
-    if [ "$issue_id" = "DAV-176" ]; then
-        echo "DAV-176-git-workflow-integration"
-        return 0
-    fi
-    
-    # Default: use issue ID with generic suffix
-    local sanitized_title
-    sanitized_title=$(sanitize_title "issue")
-    echo "${issue_id}-${sanitized_title}"
+    # Use new enhanced directory name extraction
+    extract_proper_directory_name "$issue_json"
 }
 
-# Request Linear issue details from Claude (separate function)
+# Request Linear issue details from Claude with subissue detection
 request_issue_details() {
     local issue_id="$1"
     echo "🤖 CLAUDE_LINEAR_ACTION: GET_ISSUE $issue_id"
+    
+    # Enhanced subissue detection for testing and production integration
+    _detect_and_log_subissue_info
 }
 
 # Get Linear issue status - outputs Claude action marker
 get_linear_status() {
     local issue_id="$1"
     
-    # Mock status for testing when explicitly requested
-    if [ "${MOCK_ISSUE_STATUS:-}" ]; then
-        echo "$MOCK_ISSUE_STATUS"
-        return 0
-    fi
-    
-    # Output Claude action marker for Linear MCP integration
-    echo "🤖 CLAUDE_LINEAR_ACTION: GET_ISSUE $issue_id"
-    echo "ℹ️ Waiting for Claude to fetch Linear issue details..."
-    
-    # For now, return a placeholder - Claude will handle the actual fetch
-    echo "Claude-Managed"
+    # This function is called when user wants to check issue status
+    # In real usage, Claude would handle the Linear MCP call
+    echo "Fetching Linear issue status for $issue_id..."
     return 0
 }
 
@@ -154,12 +170,6 @@ update_linear_status() {
     if [ "$DRY_RUN" = true ]; then
         log "INFO" "Would update Linear issue $issue_id to $status_name status"
         return 0
-    fi
-    
-    # Mock API failure for testing
-    if [ "${LINEAR_API_MOCK_FAILURE:-}" = "true" ]; then
-        log "ERROR" "Linear API unavailable"
-        return 1
     fi
     
     # Output Claude action marker for Linear status update
@@ -234,8 +244,71 @@ create_worktree() {
     # Add issue context to worktree
     echo "# Issue: $issue_id" > "$full_path/README.md"
     
+    # Create parent context file for subissues
+    _create_subissue_parent_context "$issue_id" "$full_path"
+    
     log "SUCCESS" "Worktree created successfully"
     return 0
+}
+
+# Helper function: Detect and log subissue information  
+_detect_and_log_subissue_info() {
+    local issue_id="${1:-$ISSUE_ID}"
+    
+    # Fetch issue data from Linear MCP
+    local issue_json
+    issue_json=$(echo "🤖 CLAUDE_LINEAR_ACTION: GET_ISSUE_JSON $issue_id" >&2)
+    
+    if [ -n "$issue_json" ] && echo "$issue_json" | jq . >/dev/null 2>&1; then
+        local is_subissue
+        is_subissue=$(detect_subissue "$issue_json")
+        
+        if [ "$is_subissue" = "true" ]; then
+            local parent_id
+            parent_id=$(echo "$issue_json" | jq -r '.parentId // empty')
+            
+            if [ -n "$parent_id" ]; then
+                log "INFO" "Detected subissue with parent: $parent_id"
+            fi
+        fi
+    fi
+}
+
+# Helper function: Create parent context file for subissues
+_create_subissue_parent_context() {
+    local issue_id="$1"
+    local worktree_path="$2"
+    
+    # Fetch issue data from Linear MCP
+    local issue_json
+    issue_json=$(echo "🤖 CLAUDE_LINEAR_ACTION: GET_ISSUE_JSON $issue_id" >&2)
+    
+    if [ -n "$issue_json" ] && echo "$issue_json" | jq . >/dev/null 2>&1; then
+        local is_subissue
+        is_subissue=$(detect_subissue "$issue_json")
+        
+        if [ "$is_subissue" = "true" ]; then
+            local parent_id
+            parent_id=$(echo "$issue_json" | jq -r '.parentId // empty')
+            
+            if [ -n "$parent_id" ]; then
+                log "INFO" "Creating parent context file for subissue"
+                
+                # Load parent context and create file
+                local parent_data
+                if parent_data=$(load_parent_context "$parent_id"); then
+                    if ! create_parent_context_file "$parent_data" "$worktree_path"; then
+                        log "WARN" "Failed to create parent context file - continuing without parent context"
+                    else
+                        log "SUCCESS" "Parent context file created successfully"
+                    fi
+                else
+                    log "WARN" "Could not fetch parent issue data - continuing without parent context"
+                    log "INFO" "Parent issue ID: $parent_id"
+                fi
+            fi
+        fi
+    fi
 }
 
 # Main workflow function

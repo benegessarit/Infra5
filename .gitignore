@@ -31,3 +31,7 @@ Thumbs.db
 dist/
 build/
 target/
+# Worktrees and temporary files
+worktrees/
+*.csv
+test-checkpoint.json

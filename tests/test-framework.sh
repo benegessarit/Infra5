@@ -73,6 +73,19 @@ assert_file_exists() {
     fi
 }
 
+# Assert that a file does not exist
+assert_file_not_exists() {
+    local file_path="$1"
+    local message="$2"
+    
+    if [ -f "$file_path" ]; then
+        echo "File should not exist but does: $file_path"
+        echo "Message: $message"
+        return 1
+    fi
+    return 0
+}
+
 # Function to assert directory exists  
 assert_dir_exists() {
     local dir_path="$1"
