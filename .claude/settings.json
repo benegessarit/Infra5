@@ -1,0 +1,92 @@
+{
+  "hooks": [
+    {
+      "name": "subagent-context-injector",
+      "description": "Automatically adds project context to sub-agent prompts",
+      "command": ".claude/hooks/selective-subagent-context-injector.sh",
+      "events": [
+        "PreToolUse"
+      ],
+      "matchers": [
+        {
+          "tool": "Task"
+        }
+      ],
+      "enabled": true
+    },
+    {
+      "name": "gemini-context-injector",
+      "description": "Automatically adds project structure to new Gemini sessions",
+      "command": ".claude/hooks/gemini-context-injector.sh",
+      "events": [
+        "PreToolUse"
+      ],
+      "matchers": [
+        {
+          "tool": "mcp__gemini__consult_gemini"
+        }
+      ],
+      "enabled": true
+    },
+    {
+      "name": "mcp-security-scanner",
+      "description": "Scans for sensitive data before sending to external services",
+      "command": ".claude/hooks/mcp-security-scan.sh",
+      "events": [
+        "PreToolUse"
+      ],
+      "matchers": [
+        {
+          "tool": "mcp__.*"
+        }
+      ],
+      "enabled": true
+    },
+    {
+      "name": "notification-sound",
+      "description": "Plays sound when Claude needs user input",
+      "command": ".claude/hooks/notify.sh input",
+      "events": [
+        "Notification"
+      ],
+      "matchers": [
+        {
+          "tool": ".*"
+        }
+      ],
+      "enabled": true
+    },
+    {
+      "name": "completion-sound",
+      "description": "Plays sound when Claude completes tasks",
+      "command": ".claude/hooks/notify.sh complete",
+      "events": [
+        "Stop"
+      ],
+      "matchers": [
+        {
+          "tool": ".*"
+        }
+      ],
+      "enabled": true
+    },
+    {
+      "name": "checkpoint-context-validator",
+      "description": "Validates checkpoint files include contextMetadata before writing",
+      "command": ".claude/hooks/checkpoint-context-validator.sh",
+      "events": [
+        "PreToolUse"
+      ],
+      "matchers": [
+        {
+          "tool": "Write"
+        }
+      ],
+      "enabled": true
+    }
+  ],
+  "project": {
+    "name": "Infra5",
+    "description": "AI Development Framework with integrated notify and subagent context injection"
+  }
+}
