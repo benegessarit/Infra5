@@ -31,3 +31,17 @@ Thumbs.db
 dist/
 build/
 target/
+# Worktrees and temporary files
+worktrees/
+*.csv
+test-checkpoint.json
+
+
+#Ignore cursor AI rules
+.cursor/rules/codacy.mdc
+
+# Backup files
+*.backup
+*.tdd-backup
+.linear-context.json
+.claude/settings.local.json*
