@@ -1,0 +1,22 @@
+[
+  {
+    "fileName": "main-overview.mdc",
+    "description": "Complete system overview documenting the multi-agent AI development framework architecture, key components, and high-level data flow"
+  },
+  {
+    "fileName": "context-management-algorithm.mdc",
+    "description": "Detailed documentation of the context injection system algorithm, including token optimization, context hierarchy rules, and session state management logic"
+  },
+  {
+    "fileName": "agent-orchestration-model.mdc",
+    "description": "Comprehensive documentation of the multi-agent system architecture, including agent allocation algorithms, specialization rules, and inter-agent communication patterns"
+  },
+  {
+    "fileName": "documentation-tier-system.mdc",
+    "description": "Detailed specification of the 3-tier documentation system, including classification algorithms, content migration rules, and tier relationship models"
+  },
+  {
+    "fileName": "workflow-dataflow.mdc",
+    "description": "Documentation of data flow through the system, covering context preservation, session handoffs, and cross-component communication patterns"
+  }
+]
