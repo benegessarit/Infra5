@@ -66,6 +66,7 @@ _extract_directory_from_branch() {
     
     # Truncate if too long for filesystem compatibility
     if [ ${#directory_name} -gt "$MAX_DIRECTORY_LENGTH" ]; then
+        echo "Warning: Directory name truncated for filesystem compatibility" >&2
         directory_name="${directory_name:0:$((MAX_DIRECTORY_LENGTH - 3))}..."
     fi
     
@@ -85,6 +86,7 @@ load_parent_context() {
     fi
     
     # Use Linear MCP to fetch parent issue data by UUID
+    # Note: Future optimization opportunity - cache parent data to avoid repeated API calls
     echo "Fetching parent issue data..." >&2
     local parent_json
     parent_json=$(echo "🤖 CLAUDE_LINEAR_ACTION: GET_ISSUE_BY_ID $parent_id" >&2)
@@ -99,6 +101,17 @@ load_parent_context() {
     echo "$parent_json"
 }
 
+
+# Helper function: Get parent ID from issue JSON
+# Input: JSON from Linear MCP
+# Output: Parent ID if exists, empty otherwise
+get_parent_id() {
+    local issue_json
+    issue_json=$(_get_json_input "$@")
+    
+    # Extract parentId safely
+    echo "$issue_json" | jq -r '.parentId // empty'
+}
 
 # Function 4: Create parent context file in worktree
 # Input: parent JSON data, worktree path

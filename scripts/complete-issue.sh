@@ -5,6 +5,9 @@
 
 set -euo pipefail
 
+# Source subissue detection functions
+source "$(dirname "$0")/subissue-functions.sh"
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -130,17 +133,21 @@ extract_directory_name() {
         return 1
     fi
     
-    # For testing purposes, return a mock directory name
-    if [ "$issue_id" = "DAV-173" ]; then
-        echo "DAV-173-integrate-context-forge"
+    # Try to use Linear data if available
+    if [ -n "${LINEAR_ISSUE_DATA:-}" ]; then
+        extract_proper_directory_name "$LINEAR_ISSUE_DATA"
         return 0
     fi
     
-    if [ "$issue_id" = "DAV-176" ]; then
-        echo "DAV-176-git-workflow-integration"
-        return 0
-    fi
+    # Try to find existing worktree directory
+    for dir in "${WORKTREE_BASE_DIR}"/*; do
+        if [[ -d "$dir" && "$(basename "$dir")" == *"$issue_id"* ]]; then
+            basename "$dir"
+            return 0
+        fi
+    done
     
+    # Fallback to generic naming
     echo "${issue_id}-issue"
 }
 
@@ -210,8 +217,15 @@ delete_worktree() {
         return 0
     fi
     
-    rm -rf "$worktree_path"
-    log "SUCCESS" "Worktree deleted: $worktree_path"
+    # Use git worktree remove if it's a proper worktree
+    if git worktree list | grep -q "$worktree_path"; then
+        git worktree remove "$worktree_path" --force
+        log "SUCCESS" "Git worktree removed: $worktree_path"
+    else
+        # Fallback to manual removal
+        rm -rf "$worktree_path"
+        log "SUCCESS" "Directory deleted: $worktree_path"
+    fi
     
     return 0
 }

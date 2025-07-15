@@ -65,10 +65,10 @@ log() {
     local message="$*"
     
     case "$level" in
-        "INFO")  echo -e "${BLUE}[INFO]${NC} $message" ;;
-        "WARN")  echo -e "${YELLOW}[WARN]${NC} $message" ;;
+        "INFO")  echo -e "${BLUE}[INFO]${NC} $message" >&2 ;;
+        "WARN")  echo -e "${YELLOW}[WARN]${NC} $message" >&2 ;;
         "ERROR") echo -e "${RED}[ERROR]${NC} $message" >&2 ;;
-        "SUCCESS") echo -e "${GREEN}[SUCCESS]${NC} $message" ;;
+        "SUCCESS") echo -e "${GREEN}[SUCCESS]${NC} $message" >&2 ;;
     esac
 }
 
@@ -132,15 +132,12 @@ extract_directory_name() {
         extract_proper_directory_name "$issue_json"
         return 0
     else
-        # Fall back to generic naming
+        # Final fallback to generic naming when no JSON data available
         log "WARN" "No Linear data available, using generic naming"
         log "INFO" "For enhanced features: 1) Run with Claude, or 2) Set LINEAR_ISSUE_DATA"
         echo "$issue_id-issue"
         return 0
     fi
-    
-    # Use new enhanced directory name extraction
-    extract_proper_directory_name "$issue_json"
 }
 
 # Request Linear issue details from Claude with subissue detection
@@ -205,6 +202,60 @@ validate_git_repo() {
     return 0
 }
 
+# Create .linear-context.json file
+create_linear_context_file() {
+    local issue_id="$1"
+    local worktree_dir="$2"
+    local git_branch="$3"
+    
+    # Only create if we have Linear data
+    if [ -z "${LINEAR_ISSUE_DATA:-}" ]; then
+        return 0
+    fi
+    
+    # Parse the Linear data
+    local issue_json="$LINEAR_ISSUE_DATA"
+    
+    # Basic validation - ensure critical fields exist
+    if ! echo "$issue_json" | jq -e '.identifier' >/dev/null 2>&1; then
+        log "WARN" "Linear data missing identifier field - context file not created"
+        return 0
+    fi
+    
+    # Add workflow metadata
+    local context_json
+    if ! context_json=$(echo "$issue_json" | jq --arg worktree "$WORKTREE_BASE_DIR/$worktree_dir" \
+        --arg branch "$git_branch" \
+        --arg timestamp "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+        '. + {
+            "workflowMetadata": {
+                "worktreePath": $worktree,
+                "gitBranch": $branch,
+                "startedAt": $timestamp
+            }
+        }' 2>/dev/null); then
+        log "ERROR" "Failed to parse Linear issue data"
+        return 1
+    fi
+    
+    # Write to repository root with atomic operation
+    local temp_file=".linear-context.json.tmp.$$"
+    if ! echo "$context_json" > "$temp_file"; then
+        log "ERROR" "Failed to write Linear context file"
+        rm -f "$temp_file"
+        return 1
+    fi
+    
+    # Atomic move to prevent race conditions
+    if ! mv "$temp_file" .linear-context.json; then
+        log "ERROR" "Failed to create .linear-context.json"
+        rm -f "$temp_file"
+        return 1
+    fi
+    
+    log "INFO" "Created .linear-context.json for cycle commands"
+}
+
 # Create git worktree
 create_worktree() {
     local issue_id="$1"
@@ -255,20 +306,20 @@ create_worktree() {
 _detect_and_log_subissue_info() {
     local issue_id="${1:-$ISSUE_ID}"
     
-    # Fetch issue data from Linear MCP
-    local issue_json
-    issue_json=$(echo "🤖 CLAUDE_LINEAR_ACTION: GET_ISSUE_JSON $issue_id" >&2)
-    
-    if [ -n "$issue_json" ] && echo "$issue_json" | jq . >/dev/null 2>&1; then
-        local is_subissue
-        is_subissue=$(detect_subissue "$issue_json")
-        
-        if [ "$is_subissue" = "true" ]; then
-            local parent_id
-            parent_id=$(echo "$issue_json" | jq -r '.parentId // empty')
+    # Only run if we have Linear JSON data
+    if [ -n "${LINEAR_ISSUE_DATA:-}" ]; then
+        # Use cached detection function with JSON data
+        if echo "$LINEAR_ISSUE_DATA" | detect_subissue >/dev/null 2>&1; then
+            local is_subissue
+            is_subissue=$(echo "$LINEAR_ISSUE_DATA" | detect_subissue)
             
-            if [ -n "$parent_id" ]; then
-                log "INFO" "Detected subissue with parent: $parent_id"
+            if [ "$is_subissue" = "true" ]; then
+                # Use cached parent ID lookup with JSON data
+                if echo "$LINEAR_ISSUE_DATA" | get_parent_id >/dev/null 2>&1; then
+                    local parent_id
+                    parent_id=$(echo "$LINEAR_ISSUE_DATA" | get_parent_id)
+                    log "INFO" "Detected subissue with parent: $parent_id"
+                fi
             fi
         fi
     fi
@@ -279,32 +330,32 @@ _create_subissue_parent_context() {
     local issue_id="$1"
     local worktree_path="$2"
     
-    # Fetch issue data from Linear MCP
-    local issue_json
-    issue_json=$(echo "🤖 CLAUDE_LINEAR_ACTION: GET_ISSUE_JSON $issue_id" >&2)
-    
-    if [ -n "$issue_json" ] && echo "$issue_json" | jq . >/dev/null 2>&1; then
-        local is_subissue
-        is_subissue=$(detect_subissue "$issue_json")
-        
-        if [ "$is_subissue" = "true" ]; then
-            local parent_id
-            parent_id=$(echo "$issue_json" | jq -r '.parentId // empty')
+    # Only run if we have Linear JSON data
+    if [ -n "${LINEAR_ISSUE_DATA:-}" ]; then
+        # Use cached detection function with JSON data
+        if echo "$LINEAR_ISSUE_DATA" | detect_subissue >/dev/null 2>&1; then
+            local is_subissue
+            is_subissue=$(echo "$LINEAR_ISSUE_DATA" | detect_subissue)
             
-            if [ -n "$parent_id" ]; then
-                log "INFO" "Creating parent context file for subissue"
-                
-                # Load parent context and create file
-                local parent_data
-                if parent_data=$(load_parent_context "$parent_id"); then
-                    if ! create_parent_context_file "$parent_data" "$worktree_path"; then
-                        log "WARN" "Failed to create parent context file - continuing without parent context"
+            if [ "$is_subissue" = "true" ]; then
+                # Use cached parent ID lookup with JSON data
+                if echo "$LINEAR_ISSUE_DATA" | get_parent_id >/dev/null 2>&1; then
+                    local parent_id
+                    parent_id=$(echo "$LINEAR_ISSUE_DATA" | get_parent_id)
+                    log "INFO" "Creating parent context file for subissue"
+                    
+                    # Load parent context and create file
+                    local parent_data
+                    if parent_data=$(load_parent_context "$parent_id"); then
+                        if ! create_parent_context_file "$parent_data" "$worktree_path"; then
+                            log "WARN" "Failed to create parent context file - continuing without parent context"
+                        else
+                            log "SUCCESS" "Parent context file created successfully"
+                        fi
                     else
-                        log "SUCCESS" "Parent context file created successfully"
+                        log "WARN" "Could not fetch parent issue data - continuing without parent context"
+                        log "INFO" "Parent issue ID: $parent_id"
                     fi
-                else
-                    log "WARN" "Could not fetch parent issue data - continuing without parent context"
-                    log "INFO" "Parent issue ID: $parent_id"
                 fi
             fi
         fi
@@ -361,6 +412,9 @@ start_issue_workflow() {
     if ! create_worktree "$issue_id" "$worktree_dir" "$git_branch"; then
         return 1
     fi
+    
+    # Create .linear-context.json for cycle commands
+    create_linear_context_file "$issue_id" "$worktree_dir" "$git_branch"
     
     # Update Linear status to In Progress
     if ! update_linear_status "$issue_id" "In Progress"; then
